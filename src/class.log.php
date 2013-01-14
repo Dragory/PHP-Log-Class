@@ -1,4 +1,11 @@
 <?php
+	/**
+	 * -------------------------------
+	 * Class Name: LogException
+	 * Desc: A custom Exception to distinguish between the logger's exceptions and other exceptions.
+	 */
+	class LogException extends Exception {}
+
 
 	/* -------------------------------
 	 * Class Name: Log
@@ -9,14 +16,14 @@
 	class Log {
 		
 		private $logs;
-		public $entry;
-		public $log_status;
+		public $entry,
+		       $log_status;
 		
-		const LOG_INACTIVE = 0;
-		const LOG_ACTIVE = 1;
-		const LOG_FAILED = 2;
+		const LOG_INACTIVE = 0,
+		      LOG_ACTIVE = 1,
+		      LOG_FAILED = 2;
 		
-		const TIMESTAMP_FORMAT = 'd/m/y - G:i:s';
+		private $timestamp_format = 'd/m/y - G:i:s';
 		
 		/**	
 		 * __construct function
@@ -27,7 +34,7 @@
 		 * @param String $timezone 
 		 */
 		
-		public function __construct($logfiles = 'temp.log', $timezone = 0)
+		public function __construct($logfiles = 'temp.log', $timezone = 0, $timestamp_format = null)
 		{
 			if(is_array($logfiles)){
 				$this->logs = $logfiles;
@@ -39,6 +46,9 @@
 			
 			$timezone = (is_string($timezone)) ? $timezone : date_default_timezone_get();
 			date_default_timezone_set($timezone);
+
+			// If the user specified a custom timestamp format, use that
+			if ($timestamp_format) $this->timestamp_format = $timestamp_format;
 			
 			$this->activateLog();
 		}
@@ -73,7 +83,7 @@
 			
 			// Add timestamp
 			if($timestamp){
-				$this->entry = '[' . date(self::TIMESTAMP_FORMAT, time()) . ']: ';
+				$this->entry = '[' . date($this->timestamp_format, time()) . ']: ';
 			}
 			
 			// Add meta data, if available
@@ -89,14 +99,15 @@
 			
 			if($this->log_status && is_string($log)){
 				
-				$fp = @fopen($this->logs[$log],'a') or die('Can\'t open log file: ' . $log);
-				
-				if($fp){
-					fwrite($fp, $this->entry);
-				}else{
+				$fp = @fopen($this->logs[$log],'a');
+
+				if (!$fp)
+				{
 					$this->log_status = self::LOG_FAILED;
+					throw new LogException('Can\'t open log file: ' . $log);
 				}
-				
+
+				fwrite($fp, $this->entry);
 				fclose($fp);
 			}
 		}
@@ -109,7 +120,8 @@
 		
 		public function clearLog($log = 'default')
 		{
-			$fp = fopen($this->logs[$log],'w') or die("can't open log");
+			$fp = @fopen($this->logs[$log],'w');
+			if (!$fp) throw new LogException('Can\'t open log file: ' . $log);
 		}
 		
 		/**	
